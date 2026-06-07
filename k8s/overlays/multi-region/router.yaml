@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kiro-v3-routing
+  namespace: kiro-v3
+data:
+  nginx.conf: |
+    upstream us_east {
+      server kiro-v3-us-east-1.kiro-v3.svc.cluster.local:80 weight=3;
+      server kiro-v3-us-east-1-backup.kiro-v3.svc.cluster.local:80 backup;
+    }
+    upstream us_west {
+      server kiro-v3-us-west-2.kiro-v3.svc.cluster.local:80 weight=2;
+    }
+    upstream eu_west {
+      server kiro-v3-eu-west-1.kiro-v3.svc.cluster.local:80 weight=2;
+    }
+    
+    geo $region {
+      default us_east;
+      10.0.0.0/8 us_east;
+      172.16.0.0/12 us_west;
+      192.168.0.0/16 eu_west;
+    }
+    
+    server {
+      listen 80;
+      location / {
+        proxy_pass http://$region;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Region $region;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+      }
+      location /health {
+        access_log off;
+        return 200 "healthy\n";
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kiro-v3-router
+  namespace: kiro-v3
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kiro-v3-router
+  template:
+    metadata:
+      labels:
+        app: kiro-v3-router
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/conf.d
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+      volumes:
+        - name: config
+          configMap:
+            name: kiro-v3-routing

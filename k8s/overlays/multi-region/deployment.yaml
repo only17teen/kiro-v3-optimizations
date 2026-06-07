@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kiro-v3-multi-region
+  namespace: kiro-v3
+data:
+  REGIONS: "us-east-1,us-west-2,eu-west-1"
+  PRIMARY_REGION: "us-east-1"
+  REPLICA_COUNT: "3"
+  CROSS_REGION_READS: "true"
+  FAILOVER_STRATEGY: "active-active"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kiro-v3-multi-region
+  namespace: kiro-v3
+  labels:
+    app: kiro-v3
+    tier: multi-region
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kiro-v3
+      tier: multi-region
+  template:
+    metadata:
+      labels:
+        app: kiro-v3
+        tier: multi-region
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - kiro-v3
+                topologyKey: topology.kubernetes.io/zone
+      containers:
+        - name: kiro-v3
+          image: kiro-v3:latest
+          envFrom:
+            - configMapRef:
+                name: kiro-v3-multi-region
+          ports:
+            - containerPort: 8080
+            - containerPort: 9090
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "2"
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiro-v3-multi-region
+  namespace: kiro-v3
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: kiro-v3
+    tier: multi-region
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kiro-v3-multi-region
+  namespace: kiro-v3
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "kiro_region"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+spec:
+  rules:
+    - host: kiro-v3.global
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kiro-v3-multi-region
+                port:
+                  number: 80
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kiro-v3-multi-region
+  namespace: kiro-v3
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: kiro-v3
+      tier: multi-region
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kiro-v3-multi-region
+  namespace: kiro-v3
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kiro-v3-multi-region
+  minReplicas: 3
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60

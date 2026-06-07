@@ -1,0 +1,72 @@
+name: Benchmark Regression
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install -e .[benchmark]
+          pip install pytest pytest-benchmark
+      - name: Download baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: benchmarks/
+        continue-on-error: true
+      - name: Run benchmarks
+        run: python benchmarks/compare.py --compare
+        id: benchmark
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: benchmarks/results/
+      - name: Comment PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('benchmarks/results/comparison.json', 'utf8'));
+            const status = results.overall_status === 'pass' ? '✅' : '❌';
+            const body = `## ${status} Benchmark Regression Test
+            
+            - **Status**: ${results.overall_status}
+            - **Regressions**: ${results.regression_count}/${results.total_benchmarks}
+            
+            <details>
+            <summary>Detailed Results</summary>
+            
+            \`\`\`json
+            ${JSON.stringify(results.comparisons, null, 2)}
+            \`\`\`
+            </details>
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+      - name: Update baseline on main
+        if: github.ref == 'refs/heads/main' && steps.benchmark.outcome == 'success'
+        run: python benchmarks/compare.py --save-baseline
+      - name: Upload new baseline
+        if: github.ref == 'refs/heads/main' && steps.benchmark.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: benchmarks/baseline.json
+          overwrite: true

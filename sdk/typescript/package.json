@@ -1,0 +1,22 @@
+{
+  "name": "@kiro/v3-sdk",
+  "version": "3.0.0",
+  "description": "TypeScript SDK for Kiro Protocol v3.0",
+  "main": "dist/kiro-client.js",
+  "types": "dist/kiro-client.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": ["kiro", "inference", "llm", "sdk"],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  }
+}
