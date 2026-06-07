@@ -1,0 +1,415 @@
+# Default values for kiro-v3.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+global:
+  imageRegistry: "ghcr.io"
+  imagePullSecrets: []
+  storageClass: "fast-ssd"
+
+# =============================================================================
+# Image Configuration
+# =============================================================================
+image:
+  repository: only17teen/kiro-v3-optimizations
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# =============================================================================
+# Replicas
+# =============================================================================
+replicaCount: 3
+
+# =============================================================================
+# Service Account
+# =============================================================================
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# =============================================================================
+# Pod Security
+# =============================================================================
+podSecurityContext:
+  fsGroup: 65534
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534
+  capabilities:
+    drop:
+      - ALL
+
+# =============================================================================
+# Service
+# =============================================================================
+service:
+  type: ClusterIP
+  port: 8080
+  metricsPort: 9090
+  grpcPort: 50051
+
+# =============================================================================
+# Ingress
+# =============================================================================
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: kiro-v3.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          port: 8080
+        - path: /metrics
+          pathType: Prefix
+          port: 9090
+  tls:
+    - secretName: kiro-v3-tls
+      hosts:
+        - kiro-v3.example.com
+
+# =============================================================================
+# Resources
+# =============================================================================
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+    nvidia.com/gpu: "1"
+  limits:
+    memory: "8Gi"
+    cpu: "4000m"
+    nvidia.com/gpu: "1"
+
+# =============================================================================
+# Autoscaling
+# =============================================================================
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  metrics:
+    - type: Pods
+      pods:
+        metric:
+          name: kiro_gpu_utilization
+        target:
+          type: AverageValue
+          averageValue: "70"
+    - type: External
+      external:
+        metric:
+          name: kiro_queue_depth
+        target:
+          type: AverageValue
+          averageValue: "50"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+
+# =============================================================================
+# Node Scheduling
+# =============================================================================
+nodeSelector:
+  nvidia.com/gpu.present: "true"
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - kiro-v3
+          topologyKey: kubernetes.io/hostname
+
+# =============================================================================
+# Kiro Configuration
+# =============================================================================
+kiro:
+  # Actor Model
+  actor:
+    shardCount: 16
+    mailboxMaxSize: 10000
+    mailboxBackpressure: 0.8
+  
+  # GPU
+  gpu:
+    count: 2
+    maxConcurrent: 4
+    tokenRate: 10.0
+    burstSize: 20
+  
+  # LLM Timeout
+  llm:
+    timeout: 30.0
+    circuitThreshold: 5
+    circuitRecovery: 30.0
+  
+  # Retry
+  retry:
+    maxRetries: 3
+    baseDelay: 1.0
+    maxDelay: 60.0
+    strategy: FULL_JITTER
+  
+  # Bandit
+  bandit:
+    exploration: 2.0
+    warmup: 5
+  
+  # Cache
+  cache:
+    maxSize: 10000
+    ttl: 3600
+    prefetchProbability: 0.3
+  
+  # GC
+  gc:
+    freezeOnBoot: true
+    freezeDuration: 300
+    backgroundInterval: 60
+  
+  # Metrics
+  metrics:
+    port: 9090
+    maxLabelValues: 100
+  
+  # Training
+  training:
+    enabled: false
+    maxSteps: 1000
+    saveSteps: 100
+  
+  # Chaos
+  chaos:
+    enabled: false
+    failureRate: 0.1
+
+# =============================================================================
+# Persistence
+# =============================================================================
+persistence:
+  checkpoints:
+    enabled: true
+    size: 100Gi
+    accessMode: ReadWriteMany
+    storageClass: "fast-ssd"
+  
+  loraOutput:
+    enabled: true
+    size: 50Gi
+    accessMode: ReadWriteMany
+    storageClass: "fast-ssd"
+  
+  logs:
+    enabled: true
+    size: 20Gi
+    accessMode: ReadWriteMany
+    storageClass: "standard"
+
+# =============================================================================
+# Secrets
+# =============================================================================
+secrets:
+  jwtSecret: "change-me-in-production"
+  apiKeys:
+    openai: ""
+    anthropic: ""
+  database:
+    host: ""
+    port: "5432"
+    user: ""
+    password: ""
+    name: ""
+  redis:
+    host: ""
+    port: "6379"
+    password: ""
+  s3:
+    endpoint: ""
+    accessKey: ""
+    secretKey: ""
+    bucket: "kiro-v3-checkpoints"
+  alerts:
+    webhookUrl: ""
+    pagerdutyKey: ""
+
+# =============================================================================
+# Monitoring
+# =============================================================================
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+  
+  prometheusRule:
+    enabled: true
+    groups:
+      - name: kiro-v3-alerts
+        rules:
+          - alert: KiroHighLatency
+            expr: histogram_quantile(0.95, kiro_inference_latency_bucket) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Kiro v3 high inference latency"
+              description: "p95 latency is above 100ms for more than 5 minutes"
+          
+          - alert: KiroLowCacheHitRate
+            expr: kiro_cache_hit_rate < 0.2
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Kiro v3 low cache hit rate"
+              description: "Cache hit rate is below 20% for more than 10 minutes"
+          
+          - alert: KiroGPUUtilizationHigh
+            expr: kiro_gpu_utilization > 0.9
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Kiro v3 GPU utilization critical"
+              description: "GPU utilization is above 90% for more than 5 minutes"
+          
+          - alert: KiroCircuitBreakerOpen
+            expr: kiro_circuit_breaker_state == 2
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Kiro v3 circuit breaker open"
+              description: "Circuit breaker is in OPEN state"
+
+# =============================================================================
+# Subcharts
+# =============================================================================
+nvidiaDevicePlugin:
+  enabled: true
+
+prometheus:
+  enabled: true
+  server:
+    persistentVolume:
+      enabled: true
+      size: 50Gi
+      storageClass: "fast-ssd"
+
+grafana:
+  enabled: true
+  admin:
+    password: "admin"
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: "standard"
+  dashboards:
+    kiro-v3:
+      url: https://raw.githubusercontent.com/only17teen/kiro-v3-optimizations/main/monitoring/grafana-dashboard.json
+
+certManager:
+  enabled: true
+
+# =============================================================================
+# Extra Configuration
+# =============================================================================
+extraEnv: []
+extraEnvFrom: []
+extraVolumes: []
+extraVolumeMounts: []
+extraContainers: []
+initContainers: []
+
+# =============================================================================
+# Pod Disruption Budget
+# =============================================================================
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# =============================================================================
+# Priority Class
+# =============================================================================
+priorityClass:
+  enabled: true
+  value: 1000000
+
+# =============================================================================
+# Network Policy
+# =============================================================================
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090
+  egress:
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+# =============================================================================
+# Testing
+# =============================================================================
+tests:
+  enabled: true
+  image:
+    repository: busybox
+    tag: latest
+    pullPolicy: IfNotPresent

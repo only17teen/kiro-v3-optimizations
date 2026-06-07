@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kiro-v3.configMapName" . }}
+  labels:
+    {{- include "kiro-v3.labels" . | nindent 4 }}
+data:
+  # Actor Model Configuration
+  KIRO_ACTOR_SHARD_COUNT: {{ .Values.kiro.actor.shardCount | quote }}
+  KIRO_MAILBOX_MAX_SIZE: {{ .Values.kiro.actor.mailboxMaxSize | quote }}
+  KIRO_MAILBOX_BACKPRESSURE: {{ .Values.kiro.actor.mailboxBackpressure | quote }}
+  
+  # GPU Configuration
+  KIRO_GPU_COUNT: {{ .Values.kiro.gpu.count | quote }}
+  KIRO_GPU_MAX_CONCURRENT: {{ .Values.kiro.gpu.maxConcurrent | quote }}
+  KIRO_GPU_TOKEN_RATE: {{ .Values.kiro.gpu.tokenRate | quote }}
+  KIRO_GPU_BURST_SIZE: {{ .Values.kiro.gpu.burstSize | quote }}
+  
+  # LLM Timeout Configuration
+  KIRO_LLM_TIMEOUT: {{ .Values.kiro.llm.timeout | quote }}
+  KIRO_LLM_CIRCUIT_THRESHOLD: {{ .Values.kiro.llm.circuitThreshold | quote }}
+  KIRO_LLM_CIRCUIT_RECOVERY: {{ .Values.kiro.llm.circuitRecovery | quote }}
+  
+  # Retry Configuration
+  KIRO_RETRY_MAX_RETRIES: {{ .Values.kiro.retry.maxRetries | quote }}
+  KIRO_RETRY_BASE_DELAY: {{ .Values.kiro.retry.baseDelay | quote }}
+  KIRO_RETRY_MAX_DELAY: {{ .Values.kiro.retry.maxDelay | quote }}
+  KIRO_RETRY_STRATEGY: {{ .Values.kiro.retry.strategy | quote }}
+  
+  # Bandit Configuration
+  KIRO_BANDIT_EXPLORATION: {{ .Values.kiro.bandit.exploration | quote }}
+  KIRO_BANDIT_WARMUP: {{ .Values.kiro.bandit.warmup | quote }}
+  
+  # Cache Configuration
+  KIRO_CACHE_MAX_SIZE: {{ .Values.kiro.cache.maxSize | quote }}
+  KIRO_CACHE_TTL: {{ .Values.kiro.cache.ttl | quote }}
+  KIRO_CACHE_PREFETCH_PROB: {{ .Values.kiro.cache.prefetchProbability | quote }}
+  
+  # GC Configuration
+  KIRO_GC_FREEZE_ON_BOOT: {{ .Values.kiro.gc.freezeOnBoot | quote }}
+  KIRO_GC_FREEZE_DURATION: {{ .Values.kiro.gc.freezeDuration | quote }}
+  KIRO_GC_BACKGROUND_INTERVAL: {{ .Values.kiro.gc.backgroundInterval | quote }}
+  
+  # Metrics Configuration
+  KIRO_METRICS_PORT: {{ .Values.kiro.metrics.port | quote }}
+  KIRO_METRICS_MAX_LABEL_VALUES: {{ .Values.kiro.metrics.maxLabelValues | quote }}
+  
+  # Training Configuration
+  KIRO_TRAINING_ENABLED: {{ .Values.kiro.training.enabled | quote }}
+  KIRO_TRAINING_MAX_STEPS: {{ .Values.kiro.training.maxSteps | quote }}
+  KIRO_TRAINING_SAVE_STEPS: {{ .Values.kiro.training.saveSteps | quote }}
+  
+  # Chaos Configuration
+  KIRO_CHAOS_ENABLED: {{ .Values.kiro.chaos.enabled | quote }}
+  KIRO_CHAOS_FAILURE_RATE: {{ .Values.kiro.chaos.failureRate | quote }}
+  
+  # Logging
+  LOG_LEVEL: {{ .Values.logLevel | default "INFO" | quote }}
+  PYTHONUNBUFFERED: "1"
+  
+  {{- if .Values.extraEnv }}
+  {{- range .Values.extraEnv }}
+  {{ .name }}: {{ .value | quote }}
+  {{- end }}
+  {{- end }}

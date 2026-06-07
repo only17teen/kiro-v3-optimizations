@@ -1,0 +1,53 @@
+{{- if .Values.persistence.checkpoints.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kiro-v3.fullname" . }}-checkpoints
+  labels:
+    {{- include "kiro-v3.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.checkpoints.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.checkpoints.size }}
+  {{- if .Values.persistence.checkpoints.storageClass }}
+  storageClassName: {{ .Values.persistence.checkpoints.storageClass }}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.persistence.loraOutput.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kiro-v3.fullname" . }}-lora-output
+  labels:
+    {{- include "kiro-v3.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.loraOutput.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.loraOutput.size }}
+  {{- if .Values.persistence.loraOutput.storageClass }}
+  storageClassName: {{ .Values.persistence.loraOutput.storageClass }}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.persistence.logs.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kiro-v3.fullname" . }}-logs
+  labels:
+    {{- include "kiro-v3.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.logs.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.logs.size }}
+  {{- if .Values.persistence.logs.storageClass }}
+  storageClassName: {{ .Values.persistence.logs.storageClass }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,44 @@
+apiVersion: v2
+name: kiro-v3
+description: Kiro Protocol v3.0 - High-Performance LLM Inference Engine Optimizations
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/only17teen/kiro-v3-optimizations
+sources:
+  - https://github.com/only17teen/kiro-v3-optimizations
+maintainers:
+  - name: Kiro Team
+    email: team@kiro.ai
+keywords:
+  - llm
+  - inference
+  - optimization
+  - actor-model
+  - gpu
+  - async
+  - machine-learning
+  - ai
+icon: https://raw.githubusercontent.com/only17teen/kiro-v3-optimizations/main/docs/logo.png
+annotations:
+  category: AI/ML
+  licenses: MIT
+dependencies:
+  - name: nvidia-device-plugin
+    version: "0.14.x"
+    repository: https://nvidia.github.io/k8s-device-plugin
+    condition: nvidiaDevicePlugin.enabled
+    alias: nvidia
+  - name: prometheus
+    version: "25.x.x"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+  - name: grafana
+    version: "7.x.x"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+  - name: cert-manager
+    version: "1.13.x"
+    repository: https://charts.jetstack.io
+    condition: certManager.enabled
+    alias: certmanager
