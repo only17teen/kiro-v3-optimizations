@@ -1,0 +1,40 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kiro-v3-engine
+  namespace: kiro-v3
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: kiro-v3-engine
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kiro-v3-engine-max-unavailable
+  namespace: kiro-v3
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: kiro-v3-engine
+---
+# PriorityClass for critical pods
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: kiro-v3-critical
+value: 1000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Critical priority for Kiro v3 engine pods"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: kiro-v3-high
+value: 500000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "High priority for Kiro v3 worker pods"

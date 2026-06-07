@@ -1,0 +1,189 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kiro-v3-engine
+  namespace: kiro-v3
+  labels:
+    app: kiro-v3-engine
+    version: v0.1.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: kiro-v3-engine
+  template:
+    metadata:
+      labels:
+        app: kiro-v3-engine
+        version: v0.1.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: kiro-v3
+      
+      # Node affinity for GPU nodes
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values:
+                      - "true"
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - kiro-v3-engine
+                topologyKey: kubernetes.io/hostname
+      
+      # Tolerations for GPU taints
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      
+      initContainers:
+        # Initialize Rust FFI library
+        - name: rust-init
+          image: kiro-v3:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "Checking Rust FFI library..."
+              ls -la /app/rust/libkiro_actor.so || echo "Rust library not found, using Python fallback"
+              echo "Initialization complete"
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: rust-lib
+              mountPath: /app/rust
+      
+      containers:
+        - name: kiro-v3-engine
+          image: kiro-v3:latest
+          imagePullPolicy: Always
+          
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+            - name: grpc
+              containerPort: 50051
+              protocol: TCP
+          
+          envFrom:
+            - configMapRef:
+                name: kiro-v3-config
+            - secretRef:
+                name: kiro-v3-secrets
+          
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: KIRO_RUST_LIB
+              value: "/app/rust/libkiro_actor.so"
+          
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1000m"
+              nvidia.com/gpu: "1"
+            limits:
+              memory: "8Gi"
+              cpu: "4000m"
+              nvidia.com/gpu: "1"
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          
+          volumeMounts:
+            - name: rust-lib
+              mountPath: /app/rust
+            - name: checkpoints
+              mountPath: /app/checkpoints
+            - name: lora-output
+              mountPath: /app/lora_output
+            - name: tmp
+              mountPath: /tmp
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            capabilities:
+              drop:
+                - ALL
+      
+      volumes:
+        - name: rust-lib
+          emptyDir: {}
+        - name: checkpoints
+          persistentVolumeClaim:
+            claimName: kiro-v3-checkpoints
+        - name: lora-output
+          persistentVolumeClaim:
+            claimName: kiro-v3-lora-output
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+      
+      securityContext:
+        fsGroup: 65534
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault

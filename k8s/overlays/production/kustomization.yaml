@@ -1,0 +1,87 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kiro-v3-production
+
+namePrefix: prod-
+nameSuffix: -v1
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: production
+  tier: backend
+
+commonAnnotations:
+  environment: production
+  cost-center: kiro-team
+  backup.velero.io/backup-volumes: checkpoints,lora-output
+
+replicas:
+  - name: kiro-v3-engine
+    count: 5
+
+images:
+  - name: ghcr.io/only17teen/kiro-v3-optimizations
+    newTag: v0.1.0
+
+configMapGenerator:
+  - name: kiro-v3-config-overlay
+    behavior: merge
+    literals:
+      - LOG_LEVEL=WARN
+      - KIRO_CHAOS_ENABLED=false
+      - KIRO_GPU_COUNT=4
+      - KIRO_RETRY_MAX_RETRIES=5
+      - KIRO_CACHE_MAX_SIZE=50000
+      - KIRO_TRAINING_ENABLED=true
+
+secretGenerator:
+  - name: kiro-v3-secrets-overlay
+    behavior: merge
+    literals:
+      - ENVIRONMENT=production
+
+patches:
+  - target:
+      kind: Deployment
+      name: kiro-v3-engine
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "8Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "32Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/nvidia.com~1gpu
+        value: "2"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/nvidia.com~1gpu
+        value: "2"
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: kiro-v3-critical
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: kiro-v3-engine-hpa
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 50
+
+  - target:
+      kind: Ingress
+      name: kiro-v3-engine
+    patch: |
+      - op: replace
+        path: /spec/rules/0/host
+        value: kiro-v3.production.example.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: kiro-v3.production.example.com

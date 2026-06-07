@@ -1,0 +1,65 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kiro-v3
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - rbac.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+
+commonLabels:
+  app.kubernetes.io/name: kiro-v3
+  app.kubernetes.io/version: "0.1.0"
+  app.kubernetes.io/managed-by: kustomize
+
+commonAnnotations:
+  app.kubernetes.io/created-by: "kiro-team"
+  app.kubernetes.io/part-of: "kiro-v3-optimizations"
+
+images:
+  - name: kiro-v3
+    newName: ghcr.io/only17teen/kiro-v3-optimizations
+    newTag: latest
+
+replicas:
+  - name: kiro-v3-engine
+    count: 3
+
+configMapGenerator:
+  - name: kiro-v3-config-overlay
+    behavior: merge
+    literals:
+      - LOG_LEVEL=INFO
+      - KIRO_CHAOS_ENABLED=false
+
+secretGenerator:
+  - name: kiro-v3-secrets-overlay
+    behavior: merge
+    literals:
+      - ENVIRONMENT=production
+
+patchesStrategicMerge:
+  - |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: kiro-v3-engine
+    spec:
+      template:
+        spec:
+          containers:
+            - name: kiro-v3-engine
+              resources:
+                requests:
+                  memory: "4Gi"
+                  cpu: "2000m"
+                limits:
+                  memory: "16Gi"
+                  cpu: "8000m"

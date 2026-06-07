@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiro-v3-engine
+  namespace: kiro-v3
+  labels:
+    app: kiro-v3-engine
+spec:
+  type: ClusterIP
+  selector:
+    app: kiro-v3-engine
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiro-v3-engine-headless
+  namespace: kiro-v3
+  labels:
+    app: kiro-v3-engine
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: kiro-v3-engine
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+      protocol: TCP
+  publishNotReadyAddresses: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kiro-v3-engine
+  namespace: kiro-v3
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - kiro-v3.example.com
+      secretName: kiro-v3-tls
+  rules:
+    - host: kiro-v3.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kiro-v3-engine
+                port:
+                  number: 8080
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: kiro-v3-engine
+                port:
+                  number: 9090
