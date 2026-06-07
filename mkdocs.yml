@@ -1,0 +1,95 @@
+site_name: Kiro Protocol v3.0 Documentation
+site_description: High-Performance LLM Inference Engine Optimizations
+site_url: https://kiro-v3-optimizations.readthedocs.io
+repo_url: https://github.com/only17teen/kiro-v3-optimizations
+repo_name: kiro-v3-optimizations
+
+nav:
+  - Home: index.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Actor Model: architecture/actor-model.md
+    - Resource Management: architecture/resources.md
+    - Resilience: architecture/resilience.md
+    - Strategy Optimization: architecture/strategy.md
+    - Learning & Adaptation: architecture/learning.md
+    - Observability: architecture/observability.md
+    - Native Optimization: architecture/native.md
+  - API Reference:
+    - Actor System: api/actor.md
+    - GPU Semaphore: api/gpu.md
+    - LLM Timeout: api/llm.md
+    - Retry Logic: api/retry.md
+    - Bandit: api/bandit.md
+    - Cache: api/cache.md
+    - Training: api/training.md
+    - Metrics: api/metrics.md
+    - Chaos: api/chaos.md
+  - Examples:
+    - Full System: examples/full-system.md
+    - Custom Actor: examples/custom-actor.md
+    - GPU Strategy: examples/gpu-strategy.md
+  - Deployment:
+    - Docker: deployment/docker.md
+    - CI/CD: deployment/ci-cd.md
+    - Monitoring: deployment/monitoring.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Testing: development/testing.md
+    - Benchmarks: development/benchmarks.md
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/only17teen/kiro-v3-optimizations
+  version:
+    provider: mike
+
+copyright: Copyright &copy; 2024 Kiro Team
