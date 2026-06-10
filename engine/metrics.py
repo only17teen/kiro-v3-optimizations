@@ -64,6 +64,17 @@ class LowCardinalityMetric:
         }
         return ",".join(f"{k}={v}" for k, v in sanitized.items())
 
+    def _parse_key(self, key: str) -> Dict[str, str]:
+        """Parse label key back into dictionary."""
+        if not key:
+            return {}
+        result = {}
+        for part in key.split(","):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                result[k] = v
+        return result
+
 
 class Counter(LowCardinalityMetric):
     """Monotonically increasing counter."""
@@ -83,8 +94,7 @@ class Counter(LowCardinalityMetric):
     
     def collect(self) -> List[Dict[str, Any]]:
         return [
-            {"labels": dict(p.split("=") for p in k.split(",") if "=" in p),
-             "value": v}
+            {"labels": self._parse_key(k), "value": v}
             for k, v in self._values.items()
         ]
 
@@ -112,6 +122,12 @@ class Gauge(LowCardinalityMetric):
     def get(self, labels: Optional[Dict[str, str]] = None) -> float:
         key = self._make_key(labels or {})
         return self._values.get(key, 0.0)
+
+    def collect(self) -> List[Dict[str, Any]]:
+        return [
+            {"labels": self._parse_key(k), "value": v}
+            for k, v in self._values.items()
+        ]
 
 
 class Histogram(LowCardinalityMetric):
@@ -143,11 +159,10 @@ class Histogram(LowCardinalityMetric):
             self._sums[key] = 0.0
             self._counts[key] = 0
         
-        # Find bucket
+        # Prometheus histograms are CUMULATIVE — increment all matching buckets
         for i, bucket in enumerate(self._buckets):
             if value <= bucket:
                 self._values[key][i] += 1
-                break
         
         self._sums[key] += value
         self._counts[key] += 1
@@ -211,11 +226,7 @@ class MetricsRegistry:
                 result[name] = {
                     "type": "gauge",
                     "help": metric.description,
-                    "values": [
-                        {"labels": dict(p.split("=") for p in k.split(",") if "=" in p),
-                         "value": v}
-                        for k, v in metric._values.items()
-                    ]
+                    "values": metric.collect()
                 }
             elif metric.metric_type == MetricType.HISTOGRAM:
                 result[name] = {

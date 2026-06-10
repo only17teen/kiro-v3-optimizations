@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import logging
+import random
 from typing import Dict, Any, Optional, List, Tuple, Set
 from dataclasses import dataclass, field
 from collections import OrderedDict
@@ -217,9 +218,6 @@ class PrecognitionCache:
             for k in to_remove:
                 del self._cache[k]
             return len(to_remove)
-
-
-import random  # For prefetch probability
 
 
 __all__ = ["PrecognitionCache", "PrecognitionConfig", "CacheEntry"]

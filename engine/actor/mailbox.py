@@ -75,11 +75,16 @@ class Mailbox:
         # Drop lowest priority first
         if priority == Priority.BACKGROUND:
             return True
-        # Check if we can drop existing low-priority messages
-        if self._queue and self._queue[-1].priority > priority.value:
-            heapq.heappop(self._queue)
-            self._dropped_count += 1
-            return False
+            
+        # Check if we can drop existing lower-priority messages
+        if self._queue:
+            # Find the message with the highest priority value (lowest importance)
+            worst_item = max(self._queue, key=lambda x: (x.priority, x.timestamp))
+            if worst_item.priority > priority.value:
+                self._queue.remove(worst_item)
+                heapq.heapify(self._queue)
+                self._dropped_count += 1
+                return False
         return True
     
     async def get(self, timeout: Optional[float] = None) -> Optional[Any]:

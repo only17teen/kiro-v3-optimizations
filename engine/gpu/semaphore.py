@@ -42,11 +42,9 @@ class GPUSemaphore:
         timeout = timeout or self.config.timeout_seconds
         start_time = time.monotonic()
         
-        async with self._lock:
-            self._queue_depth += 1
-            
         try:
             async with self._condition:
+                self._queue_depth += 1
                 while True:
                     self._replenish_tokens()
                     
@@ -81,7 +79,7 @@ class GPUSemaphore:
                         continue
                         
         finally:
-            async with self._lock:
+            async with self._condition:
                 self._queue_depth -= 1
     
     def _replenish_tokens(self) -> None:

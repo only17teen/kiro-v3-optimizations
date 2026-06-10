@@ -58,7 +58,30 @@ class ActorRouter:
             if actor_id in self._routes:
                 del self._routes[actor_id]
     
+    async def broadcast(self, message: Any) -> List[Any]:
+        """Send message to ALL healthy actors and collect results."""
+        healthy = [r for r in self._routes.values() if r.healthy]
+        if not healthy:
+            return []
+            
+        async def _safe_call(target: RouteEntry):
+            async with self._rr_lock:
+                target.load += 1
+            try:
+                if asyncio.iscoroutinefunction(target.handler):
+                    return await target.handler(message)
+                return target.handler(message)
+            finally:
+                async with self._rr_lock:
+                    target.load -= 1
+        
+        tasks = [asyncio.create_task(_safe_call(r)) for r in healthy]
+        return await asyncio.gather(*tasks, return_exceptions=True)
+
     async def route(self, message: Any, key: Optional[str] = None) -> Any:
+        if self.strategy == RouteStrategy.BROADCAST:
+            return await self.broadcast(message)
+            
         target = await self._select_target(key or str(id(message)))
         if not target or not target.healthy:
             raise RuntimeError(f"No healthy route for {key}")

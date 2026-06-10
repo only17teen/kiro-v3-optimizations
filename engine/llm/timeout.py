@@ -179,7 +179,7 @@ class LLMTimeoutManager:
             
         except asyncio.TimeoutError:
             self._total_timeouts += 1
-            await self.circuit._record_failure()
+            # Circuit breaker already recorded failure in its catch block
             raise LLMTimeoutError(f"LLM call exceeded {timeout}s")
             
         finally:
